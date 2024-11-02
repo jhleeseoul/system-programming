@@ -1,0 +1,64 @@
+================================================================
+  ./testheapmgrkr    LIFO_fixed  100000   1000   0.04  102400000
+  ./testheapmgrkr    FIFO_fixed  100000   1000   0.04  102400000
+  ./testheapmgrkr   LIFO_random  100000   1000   0.17   52723712
+  ./testheapmgrkr   FIFO_random  100000   1000   0.14   52723712
+  ./testheapmgrkr  random_fixed  100000   1000   1.63   32456704
+  ./testheapmgrkr random_random  100000   1000   1.18   16596992
+  ./testheapmgrkr         worst  100000   1000   2.97   28278784
+----------------------------------------------------------------
+  ./testheapmgrkr    LIFO_fixed  100000  10000 ./testheapimp: line 27:  3171 Killed                  $executablefile LIFO_fixed 100000 10000
+  ./testheapmgrkr    FIFO_fixed  100000  10000 ./testheapimp: line 28:  3266 Killed                  $executablefile FIFO_fixed 100000 10000
+  ./testheapmgrkr   LIFO_random  100000  10000 ./testheapimp: line 29:  3380 Killed                  $executablefile LIFO_random 100000 10000
+  ./testheapmgrkr   FIFO_random  100000  10000 ./testheapimp: line 30:  3494 Killed                  $executablefile FIFO_random 100000 10000
+  ./testheapmgrkr  random_fixed  100000  10000 ./testheapimp: line 31:  3603 Killed                  $executablefile random_fixed 100000 10000
+  ./testheapmgrkr random_random  100000  10000 ./testheapimp: line 32:  3716 Killed                  $executablefile random_random 100000 10000
+  ./testheapmgrkr         worst  100000  10000 ./testheapimp: line 33:  3828 Killed                  $executablefile worst 100000 10000
+================================================================
+./testheapmgrbase    LIFO_fixed  100000   1000   0.04  102500000
+./testheapmgrbase    FIFO_fixed  100000   1000   0.05  102500000
+./testheapmgrbase   LIFO_random  100000   1000   0.03   52316000
+./testheapmgrbase   FIFO_random  100000   1000   0.02   52316000
+./testheapmgrbase  random_fixed  100000   1000   1.36   32537600
+./testheapmgrbase random_random  100000   1000   1.04   16613200
+./testheapmgrbase         worst  100000   1000   4.00   27863600
+----------------------------------------------------------------
+./testheapmgrbase    LIFO_fixed  100000  10000 ./testheapimp: line 27:  4024 Killed                  $executablefile LIFO_fixed 100000 10000
+./testheapmgrbase    FIFO_fixed  100000  10000 ./testheapimp: line 28:  4123 Killed                  $executablefile FIFO_fixed 100000 10000
+./testheapmgrbase   LIFO_random  100000  10000 ./testheapimp: line 29:  4230 Killed                  $executablefile LIFO_random 100000 10000
+./testheapmgrbase   FIFO_random  100000  10000 ./testheapimp: line 30:  4344 Killed                  $executablefile FIFO_random 100000 10000
+./testheapmgrbase  random_fixed  100000  10000 ./testheapimp: line 31:  4456 Killed                  $executablefile random_fixed 100000 10000
+./testheapmgrbase random_random  100000  10000   9.22  160293600
+./testheapmgrbase         worst  100000  10000   3.81  344564000
+================================================================
+   ./testheapmgr1    LIFO_fixed  100000   1000   0.18  403200000
+   ./testheapmgr1    FIFO_fixed  100000   1000   0.17  403200000
+   ./testheapmgr1   LIFO_random  100000   1000   0.10  204580832
+   ./testheapmgr1   FIFO_random  100000   1000   0.10  204580832
+   ./testheapmgr1  random_fixed  100000   1000   0.06  127600704
+   ./testheapmgr1 random_random  100000   1000   0.04   64565056
+   ./testheapmgr1         worst  100000   1000   5.26  105600000
+----------------------------------------------------------------
+   ./testheapmgr1    LIFO_fixed  100000  10000   0.19 4003200000
+   ./testheapmgr1    FIFO_fixed  100000  10000   0.17 4003200000
+   ./testheapmgr1   LIFO_random  100000  10000   0.16 2010340544
+   ./testheapmgr1   FIFO_random  100000  10000   0.17 2010340544
+   ./testheapmgr1  random_fixed  100000  10000   0.07 1269014400
+   ./testheapmgr1 random_random  100000  10000   0.07  636584096
+   ./testheapmgr1         worst  100000  10000   9.09 1005600000
+================================================================
+   ./testheapmgr2    LIFO_fixed  100000   1000   0.23  403200000
+   ./testheapmgr2    FIFO_fixed  100000   1000   0.21  403200000
+   ./testheapmgr2   LIFO_random  100000   1000   0.14  204900384
+   ./testheapmgr2   FIFO_random  100000   1000   0.15  204900384
+   ./testheapmgr2  random_fixed  100000   1000   0.09  127451520
+   ./testheapmgr2 random_random  100000   1000 ./testheapimp: line 24:  4922 Killed                  $executablefile random_random 100000 1000
+   ./testheapmgr2         worst  100000   1000   5.25  105600000
+----------------------------------------------------------------
+   ./testheapmgr2    LIFO_fixed  100000  10000   0.23 4003200000
+   ./testheapmgr2    FIFO_fixed  100000  10000   0.23 4003200000
+   ./testheapmgr2   LIFO_random  100000  10000   0.42 2003836320
+   ./testheapmgr2   FIFO_random  100000  10000   0.38 2005451488
+   ./testheapmgr2  random_fixed  100000  10000   0.09 1268574048
+   ./testheapmgr2 random_random  100000  10000 ./testheapimp: line 32:  5117 Killed                  $executablefile random_random 100000 10000
+   ./testheapmgr2         worst  100000  10000   8.84 1005600000
