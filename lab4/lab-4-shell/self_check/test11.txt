@@ -1,0 +1,6 @@
+
+echo\# TEST 11. Background execution of multiple processes test
+
+./tools/myprod 4 | sort -rn | wc -l > result11 &
+
+echo \# TEST 11 end
