@@ -18,23 +18,15 @@ extern int bg_cnt;
 void redout_handler(char *fname) {
     int fd;
 
-    //
-    // TODO redout_handler() in execute.c start
-    //
-
-    fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd < 0) {
-		error_print(NULL, PERROR);
-		exit(EXIT_FAILURE);
-	}
-	else {
-		dup2(fd, STDOUT_FILENO);
-		close(fd);
-	}
+    fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        error_print(NULL, PERROR);
+        exit(EXIT_FAILURE);
+    } else {
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
 }
-
-
-
 
 /*---------------------------------------------------------------------------*/
 void redin_handler(char *fname) {
@@ -79,7 +71,8 @@ int build_command_partial(DynArray_T oTokens, int start,
 			redout = TRUE;
 	}
 	args[cnt] = NULL;
-#ifdef DEBUG // how to execute this code : $ DEBUG=1 ./snush
+
+#ifdef DEBUG
 	for (i = 0; i < cnt; i++)
 	{
 		if (args[i] == NULL)
@@ -151,147 +144,101 @@ void execute_builtin(DynArray_T oTokens, enum BuiltinType btype) {
 	Add "signal(SIGINT, SIG_DFL);" after fork
 */
 int fork_exec(DynArray_T oTokens, int is_background) {
-    pid_t pid;
-    int status;
-    char *args[128];
+    pid_t pid = fork();
 
-    // 명령어 빌드
-    build_command(oTokens, args);
+    if (pid == 0) { // Child process
+        signal(SIGINT, SIG_DFL); // Ctrl-C 처리
+        char *args[MAX_ARGS_CNT];
+        build_command(oTokens, args);
 
-    // 자식 프로세스 생성
-    pid = fork();
-    if (pid < 0) {
-        perror("fork failed");
-        return -1;
-    } else if (pid == 0) {
-        // 자식 프로세스
-
-        // 리다이렉션 처리
-        for (int i = 0; i < dynarray_get_length(oTokens); i++) {
-            char *token = dynarray_get(oTokens, i);
-            if (strcmp(token, ">") == 0) {
-                // 출력 리다이렉션
-                redout_handler(dynarray_get(oTokens, i + 1));
-                break;
-            }
-        }
-
-        signal(SIGINT, SIG_DFL); // SIGINT 기본 동작 복원
-
-        // 명령어 실행
-        if (execvp(args[0], args) < 0) {
-            perror("execvp failed");
+        if (execvp(args[0], args) == -1) {
+            perror("execvp");
             exit(EXIT_FAILURE);
         }
-    } else {
-        // 부모 프로세스
+    } else if (pid > 0) { // Parent process
         if (!is_background) {
-            // 포그라운드 작업
-            waitpid(pid, &status, 0);
+            waitpid(pid, NULL, 0);
         } else {
-            // 백그라운드 작업
             bg_array[bg_array_idx++] = pid;
             bg_cnt++;
-            printf("[Background process started: %d]\n", pid);
         }
+    } else {
+        perror("fork");
+        return -1;
     }
-
     return pid;
 }
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Important Notice!! 
 	Add "signal(SIGINT, SIG_DFL);" after fork
 */
 int iter_pipe_fork_exec(int pcount, DynArray_T oTokens, int is_background) {
-    int pipe_fd[2];         // 현재 파이프의 파일 디스크립터
-    int prev_fd = -1;       // 이전 파이프의 읽기 끝
-    pid_t pid;              // 자식 프로세스 ID
-    int i, status;          // 반복문 및 상태 변수
-    char *args[128];        // 명령어와 인자를 담는 배열
-    int first_pid = -1;     // 첫 번째 자식의 PID를 저장
-    int start = 0, end;     // 토큰의 범위
+    int i, pipe_fd[2], prev_fd = -1;
+    pid_t pid;
+    int cmd_start = 0, cmd_end = 0;
+    char *args[MAX_ARGS_CNT];
 
     for (i = 0; i <= pcount; i++) {
-        // 다음 파이프 기호의 위치를 찾음
-        end = dynarray_get_length(oTokens);
-        for (int j = start; j < dynarray_get_length(oTokens); j++) {
-            if (strcmp((char *)dynarray_get(oTokens, j), "|") == 0) {
-                end = j;  // 파이프 기호의 인덱스를 end로 설정
-                break;
-            }
-        }
-
-        // 파이프 생성 (마지막 명령어가 아닐 때만)
+        // 다음 파이프 생성
         if (i < pcount) {
             if (pipe(pipe_fd) < 0) {
-                error_print("pipe failed", FPRINTF);
+                perror("pipe");
                 return -1;
             }
         }
 
-        // 자식 프로세스 생성
+        // 명령어 끝 인덱스 찾기
+        cmd_end = cmd_start;
+        while (cmd_end < dynarray_get_length(oTokens)) {
+            struct Token *t = dynarray_get(oTokens, cmd_end);
+            if (t->token_type == TOKEN_PIPE) break;
+            cmd_end++;
+        }
+
         pid = fork();
         if (pid < 0) {
-            error_print("fork failed", FPRINTF);
+            perror("fork");
             return -1;
-        } else if (pid == 0) {
-            // 자식 프로세스
-            signal(SIGINT, SIG_DFL);  // 기본 SIGINT 핸들러 복원
+        }
 
-            // 이전 파이프의 읽기 끝을 표준 입력으로 연결
-            if (prev_fd != -1) {
-                if (dup2(prev_fd, STDIN_FILENO) < 0) {
-                    error_print("dup2 failed (input)", FPRINTF);
-                    exit(EXIT_FAILURE);
-                }
+        if (pid == 0) { // 자식 프로세스
+			signal(SIGINT, SIG_DFL); // Ctrl-C 처리
+            if (prev_fd != -1) { // 이전 프로세스 출력 연결
+                dup2(prev_fd, STDIN_FILENO);
                 close(prev_fd);
             }
-
-            // 현재 파이프의 쓰기 끝을 표준 출력으로 연결
-            if (i < pcount) {
-                if (dup2(pipe_fd[1], STDOUT_FILENO) < 0) {
-                    error_print("dup2 failed (output)", FPRINTF);
-                    exit(EXIT_FAILURE);
-                }
+            if (i < pcount) { // 다음 프로세스 입력 연결
+                dup2(pipe_fd[1], STDOUT_FILENO);
                 close(pipe_fd[0]);
                 close(pipe_fd[1]);
             }
 
-            // 명령어 빌드 및 실행
-            if (build_command_partial(oTokens, start, end, args) < 0) {
-                error_print("build_command_partial failed", FPRINTF);
-                exit(EXIT_FAILURE);
+            // 명령 빌드 및 실행
+            build_command_partial(oTokens, cmd_start, cmd_end, args);
+            execvp(args[0], args);
+            perror("execvp"); // exec 실패 시 에러 출력
+            exit(EXIT_FAILURE);
+        } else { // 부모 프로세스
+            if (prev_fd != -1) close(prev_fd); // 이전 읽기 파이프 닫기
+            if (i < pcount) {
+                close(pipe_fd[1]); // 현재 쓰기 파이프 닫기
+                prev_fd = pipe_fd[0]; // 다음 프로세스를 위해 읽기 파이프 저장
             }
-            if (execvp(args[0], args) < 0) {
-                error_print(args[0], PERROR);
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            // 부모 프로세스
-            if (i == 0) first_pid = pid;
-            if (prev_fd != -1) close(prev_fd);
-            if (i < pcount) close(pipe_fd[1]);
 
-            prev_fd = pipe_fd[0];
+            if (!is_background) {
+                waitpid(pid, NULL, 0); // 포그라운드 프로세스는 대기
+            } else {
+                bg_array[bg_array_idx++] = pid; // 백그라운드 프로세스 등록
+                bg_cnt++;
+            }
         }
 
-        // 다음 명령어의 시작 위치 설정
-        start = end + 1;
+        cmd_start = cmd_end + 1; // 다음 명령어 시작 인덱스 설정
     }
 
-    // 모든 자식 프로세스 대기
-    for (i = 0; i <= pcount; i++) {
-        waitpid(-1, &status, 0);
-    }
-
-    return first_pid;  // 첫 번째 자식 프로세스의 PID 반환
+    if (prev_fd != -1) close(prev_fd); // 마지막 읽기 파이프 닫기
+    return 0;
 }
-
-
-
-
 
 /*---------------------------------------------------------------------------*/
