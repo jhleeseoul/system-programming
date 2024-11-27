@@ -174,13 +174,14 @@ int fork_exec(DynArray_T oTokens, int is_background) {
 	Add "signal(SIGINT, SIG_DFL);" after fork
 */
 int iter_pipe_fork_exec(int pcount, DynArray_T oTokens, int is_background) {
-    int i, pipe_fd[2], prev_fd = -1;
+    int pipe_fd[2], prev_fd = -1; // 현재 및 이전 파이프 파일 디스크립터
+    int i, cmd_start = 0, cmd_end = 0;
     pid_t pid;
-    int cmd_start = 0, cmd_end = 0;
     char *args[MAX_ARGS_CNT];
+    int ret_status = 0; // 최종 반환 상태
 
     for (i = 0; i <= pcount; i++) {
-        // 다음 파이프 생성
+        // 파이프 생성
         if (i < pcount) {
             if (pipe(pipe_fd) < 0) {
                 perror("pipe");
@@ -188,7 +189,7 @@ int iter_pipe_fork_exec(int pcount, DynArray_T oTokens, int is_background) {
             }
         }
 
-        // 명령어 끝 인덱스 찾기
+        // 명령어 끝 구간 찾기
         cmd_end = cmd_start;
         while (cmd_end < dynarray_get_length(oTokens)) {
             struct Token *t = dynarray_get(oTokens, cmd_end);
@@ -196,6 +197,7 @@ int iter_pipe_fork_exec(int pcount, DynArray_T oTokens, int is_background) {
             cmd_end++;
         }
 
+        // 프로세스 생성
         pid = fork();
         if (pid < 0) {
             perror("fork");
@@ -203,42 +205,56 @@ int iter_pipe_fork_exec(int pcount, DynArray_T oTokens, int is_background) {
         }
 
         if (pid == 0) { // 자식 프로세스
-			signal(SIGINT, SIG_DFL); // Ctrl-C 처리
-            if (prev_fd != -1) { // 이전 프로세스 출력 연결
-                dup2(prev_fd, STDIN_FILENO);
+			signal(SIGINT, SIG_DFL); // 기본 동작으로 복원
+            if (prev_fd != -1) {
+                dup2(prev_fd, STDIN_FILENO); // 이전 출력 -> 현재 입력
                 close(prev_fd);
             }
-            if (i < pcount) { // 다음 프로세스 입력 연결
-                dup2(pipe_fd[1], STDOUT_FILENO);
+            if (i < pcount) {
+                dup2(pipe_fd[1], STDOUT_FILENO); // 현재 출력 -> 다음 입력
                 close(pipe_fd[0]);
                 close(pipe_fd[1]);
             }
 
-            // 명령 빌드 및 실행
+            // 명령어 빌드 및 실행
             build_command_partial(oTokens, cmd_start, cmd_end, args);
-            execvp(args[0], args);
-            perror("execvp"); // exec 실패 시 에러 출력
-            exit(EXIT_FAILURE);
+#ifdef DEBUG
+            fprintf(stderr, "Executing command in child: %s\n", args[0]);
+#endif
+            if (execvp(args[0], args) == -1) {
+                perror("execvp");
+                exit(EXIT_FAILURE);
+            }
         } else { // 부모 프로세스
             if (prev_fd != -1) close(prev_fd); // 이전 읽기 파이프 닫기
             if (i < pcount) {
                 close(pipe_fd[1]); // 현재 쓰기 파이프 닫기
-                prev_fd = pipe_fd[0]; // 다음 프로세스를 위해 읽기 파이프 저장
+                prev_fd = pipe_fd[0]; // 다음 읽기 파이프 설정
             }
 
             if (!is_background) {
-                waitpid(pid, NULL, 0); // 포그라운드 프로세스는 대기
+                int status;
+                waitpid(pid, &status, 0); // 포그라운드 대기
+                if (WIFEXITED(status)) {
+                    ret_status = WEXITSTATUS(status);
+                } else {
+					// printf("Child process %d terminated abnormally\n", pid);
+                    ret_status = -1; // 비정상 종료
+                }
             } else {
-                bg_array[bg_array_idx++] = pid; // 백그라운드 프로세스 등록
+                bg_array[bg_array_idx++] = pid; // 백그라운드 등록
                 bg_cnt++;
             }
         }
 
-        cmd_start = cmd_end + 1; // 다음 명령어 시작 인덱스 설정
+        cmd_start = cmd_end + 1; // 다음 명령어 시작 인덱스
     }
 
     if (prev_fd != -1) close(prev_fd); // 마지막 읽기 파이프 닫기
-    return 0;
+	return ret_status == 0 ? 1 : -1; // 성공 시 1 반환
+
 }
+
+
 
 /*---------------------------------------------------------------------------*/

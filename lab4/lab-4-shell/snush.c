@@ -92,11 +92,11 @@ static void shell_helper(const char *in_line) {
                     ret_pgid = fork_exec(oTokens, is_background);
                 }
 
-                if (ret_pgid > 0) {
+                if (ret_pgid > 0) { 
                     if (is_background == 1)
                         printf("[%d] Background process running\n", ret_pgid);
-                }
-                else {
+                } 
+                else { 
                     printf("Invalid return value "\
                         "of external command execution\n");
                 }
