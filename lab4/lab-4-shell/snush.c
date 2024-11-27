@@ -25,17 +25,38 @@ static void sigzombie_handler(int signo) {
     int stat;
 
     if (signo == SIGCHLD) {
-        
-        while((pid = waitpid(-1, &stat, WNOHANG)) > 0) {
+        while ((pid = waitpid(-1, &stat, WNOHANG)) > 0) {
             //
-            // TODO sigzombie_handler() in snush.c start 
+            // TODO sigzombie_handler() in snush.c start
             //
+
+            // Remove the process ID from the background process array
+            for (int i = 0; i < bg_array_idx; i++) {
+                if (bg_array[i] == pid) {
+                    bg_array[i] = bg_array[bg_array_idx - 1]; // Replace with last PID
+                    bg_array_idx--;
+                    bg_cnt--;
+                    break;
+                }
+            }
+
+            // Print the termination message
+            if (WIFEXITED(stat)) {
+                printf("[Process %d terminated with exit code %d]\n", pid, WEXITSTATUS(stat));
+            } else if (WIFSIGNALED(stat)) {
+                printf("[Process %d terminated by signal %d]\n", pid, WTERMSIG(stat));
+            } else {
+                printf("[Process %d terminated unexpectedly]\n", pid);
+            }
+
+            fflush(stdout);
 
             //
             // TODO sigzombie_handler() in snush.c end
-            // 
+            //
         }
 
+        // Handle errors from waitpid
         if (pid < 0 && errno != ECHILD && errno != EINTR) {
             perror("waitpid");
         }
@@ -43,6 +64,7 @@ static void sigzombie_handler(int signo) {
 
     return;
 }
+
 /*---------------------------------------------------------------------------*/
 static void shell_helper(const char *in_line) {
     DynArray_T oTokens;
@@ -91,7 +113,7 @@ static void shell_helper(const char *in_line) {
                     ret_pgid = fork_exec(oTokens, is_background);
                 }
 
-                if (ret_pgid > 0) {
+                if (ret_pgid > 0) { 
                     if (is_background == 1)
                         printf("[%d] Background process running\n", ret_pgid);
                 }
