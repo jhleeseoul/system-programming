@@ -83,11 +83,15 @@ int rwlock_read_lock(rwlock_t *rw)
 /*---------------------------------------------------------------------------*/
     /* edit here */
 
+    pthread_mutex_lock(&rw->lock);
 
+    while (rw->write_count > 0)
+    {
+        pthread_cond_wait(&rw->readers, &rw->lock);
+    }
 
-
-
-
+    rw->read_count++;
+    pthread_mutex_unlock(&rw->lock);
 
 /*---------------------------------------------------------------------------*/
     return 0;
@@ -100,11 +104,16 @@ int rwlock_read_unlock(rwlock_t *rw)
 /*---------------------------------------------------------------------------*/
     /* edit here */
 
+    pthread_mutex_lock(&rw->lock);
 
+    rw->read_count--;
 
+    if (rw->read_count == 0)
+    {
+        pthread_cond_signal(&rw->writers); // 마지막 리더가 나가면 쓰기 대기 쓰레드 깨움
+    }
 
-
-
+    pthread_mutex_unlock(&rw->lock);
 
 /*---------------------------------------------------------------------------*/
     return 0;
@@ -116,11 +125,16 @@ int rwlock_write_lock(rwlock_t *rw)
 /*---------------------------------------------------------------------------*/
     /* edit here */
 
+    pthread_mutex_lock(&rw->lock);
 
+    rw->write_count++; // 쓰기 대기 중인 쓰레드 수 증가
 
+    while (rw->read_count > 0 || rw->write_count > 1)
+    {
+        pthread_cond_wait(&rw->writers, &rw->lock);
+    }
 
-
-
+    pthread_mutex_unlock(&rw->lock);
 
 /*---------------------------------------------------------------------------*/
     return 0;
@@ -133,11 +147,17 @@ int rwlock_write_unlock(rwlock_t *rw)
 /*---------------------------------------------------------------------------*/
     /* edit here */
 
+    pthread_mutex_lock(&rw->lock);
 
+    rw->write_count--;
 
+    if (rw->write_count == 0)
+    {
+        pthread_cond_broadcast(&rw->readers); // 모든 리더를 깨움
+        pthread_cond_signal(&rw->writers);    // 대기 중인 쓰기 쓰레드를 깨움
+    }
 
-
-
+    pthread_mutex_unlock(&rw->lock);
 
 /*---------------------------------------------------------------------------*/
     return 0;

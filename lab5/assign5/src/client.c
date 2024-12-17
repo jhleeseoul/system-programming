@@ -24,7 +24,10 @@ int main(int argc, char *argv[])
 
 /*---------------------------------------------------------------------------*/
     /* free to declare any variables */
-    
+    int sockfd;
+    struct sockaddr_in server_addr;
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_received;
 /*---------------------------------------------------------------------------*/
 
     /* parse command line options */
@@ -60,11 +63,104 @@ int main(int argc, char *argv[])
 /*---------------------------------------------------------------------------*/
     /* edit here */
 
+    /* 서버에 연결 설정 */
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
 
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0)
+    {
+        perror("Invalid IP address");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        perror("connect failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
+    printf("Connected to %s:%d\n", ip, port);
 
+    /* 인터랙티브 모드 */
+    if (interactive)
+    {
+        while (1)
+        {
+            printf("Enter command: ");
+            if (fgets(buffer, sizeof(buffer), stdin) == NULL)
+            {
+                printf("Input terminated. Closing connection.\n");
+                break;
+            }
 
+            /* 입력된 명령 전송 */
+            if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+            {
+                perror("send failed");
+                break;
+            }
+
+            /* 서버 응답 수신 */
+            bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+            if (bytes_received > 0)
+            {
+                buffer[bytes_received] = '\0'; // Null-terminate buffer
+                printf("Server reply: %s", buffer);
+            }
+            else if (bytes_received == 0)
+            {
+                printf("Server closed the connection.\n");
+                break;
+            }
+            else
+            {
+                perror("recv failed");
+                break;
+            }
+        }
+    }
+    else
+    {
+        /* 비-인터랙티브 모드: 명령어 파일 입력 */
+        while (fgets(buffer, sizeof(buffer), stdin) != NULL)
+        {
+            /* 명령 전송 */
+            if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+            {
+                perror("send failed");
+                break;
+            }
+
+            /* 서버 응답 수신 */
+            bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+            if (bytes_received > 0)
+            {
+                buffer[bytes_received] = '\0';
+                printf("%s", buffer);
+            }
+            else if (bytes_received == 0)
+            {
+                printf("Server closed the connection.\n");
+                break;
+            }
+            else
+            {
+                perror("recv failed");
+                break;
+            }
+        }
+    }
+
+    close(sockfd);
+    printf("Connection closed.\n");
 
 /*---------------------------------------------------------------------------*/
 

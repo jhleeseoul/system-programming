@@ -118,19 +118,42 @@ int hash_insert(hashtable_t *table, const char *key, const char *value)
 {
     TRACE_PRINT();
     node_t *node;
-    rwlock_t *lock;
     unsigned int index = hash(key, table->hash_size);
+    rwlock_t *lock = &table->locks[index];
 
 /*---------------------------------------------------------------------------*/
     /* edit here */
     
+    /* 쓰기 락 획득 */
+    rwlock_write_lock(lock);
 
+    /* 버킷에 같은 키가 있는지 검사 */
+    for (node = table->buckets[index]; node; node = node->next)
+    {
+        if (strcmp(node->key, key) == 0)
+        {
+            rwlock_write_unlock(lock);
+            return 0; // Collision (키가 이미 존재)
+        }
+    }
 
+    /* 새로운 노드 할당 및 데이터 삽입 */
+    node = malloc(sizeof(node_t));
+    if (!node)
+    {
+        rwlock_write_unlock(lock);
+        return -1; // 메모리 할당 실패
+    }
+    node->key = strdup(key);
+    node->value = strdup(value);
+    node->next = table->buckets[index];
+    table->buckets[index] = node;
 
+    table->bucket_sizes[index]++;
+    table->total_entries++;
 
-
-
-
+    /* 쓰기 락 해제 */
+    rwlock_write_unlock(lock);
     
 /*---------------------------------------------------------------------------*/
 
@@ -142,19 +165,28 @@ int hash_search(hashtable_t *table, const char *key, const char **value)
 {
     TRACE_PRINT();
     node_t *node;
-    rwlock_t *lock;
     unsigned int index = hash(key, table->hash_size);
+    rwlock_t *lock = &table->locks[index];
 
 /*---------------------------------------------------------------------------*/
     /* edit here */
     
+    /* 읽기 락 획득 */
+    rwlock_read_lock(lock);
 
+    /* 버킷에서 키 검색 */
+    for (node = table->buckets[index]; node; node = node->next)
+    {
+        if (strcmp(node->key, key) == 0)
+        {
+            *value = node->value;
+            rwlock_read_unlock(lock);
+            return 1; // 키를 찾음
+        }
+    }
 
-
-
-
-
-
+    /* 읽기 락 해제 */
+    rwlock_read_unlock(lock);
     
 /*---------------------------------------------------------------------------*/
 
@@ -166,20 +198,29 @@ int hash_update(hashtable_t *table, const char *key, const char *value)
 {
     TRACE_PRINT();
     node_t *node;
-    rwlock_t *lock;
-    char *new_value;
     unsigned int index = hash(key, table->hash_size);
+    rwlock_t *lock = &table->locks[index];
 
 /*---------------------------------------------------------------------------*/
     /* edit here */
     
+    /* 쓰기 락 획득 */
+    rwlock_write_lock(lock);
 
+    /* 버킷에서 키 검색 후 값 갱신 */
+    for (node = table->buckets[index]; node; node = node->next)
+    {
+        if (strcmp(node->key, key) == 0)
+        {
+            free(node->value);           // 기존 값 메모리 해제
+            node->value = strdup(value); // 새 값 복사
+            rwlock_write_unlock(lock);
+            return 1; // 값 갱신 성공
+        }
+    }
 
-
-
-
-
-
+    /* 쓰기 락 해제 */
+    rwlock_write_unlock(lock);
     
 /*---------------------------------------------------------------------------*/
 
@@ -190,20 +231,45 @@ int hash_update(hashtable_t *table, const char *key, const char *value)
 int hash_delete(hashtable_t *table, const char *key)
 {
     TRACE_PRINT();
-    node_t *node, *prev;
-    rwlock_t *lock;
+    node_t *node, *prev = NULL;
     unsigned int index = hash(key, table->hash_size);
+    rwlock_t *lock = &table->locks[index];
 
 /*---------------------------------------------------------------------------*/
     /* edit here */
     
+    /* 쓰기 락 획득 */
+    rwlock_write_lock(lock);
 
+    /* 버킷에서 노드 검색 및 삭제 */
+    for (node = table->buckets[index]; node; node = node->next)
+    {
+        if (strcmp(node->key, key) == 0)
+        {
+            if (prev)
+            {
+                prev->next = node->next; // 이전 노드가 있을 경우 연결
+            }
+            else
+            {
+                table->buckets[index] = node->next; // 버킷의 첫 노드 제거
+            }
 
+            free(node->key);
+            free(node->value);
+            free(node);
 
+            table->bucket_sizes[index]--;
+            table->total_entries--;
 
+            rwlock_write_unlock(lock);
+            return 1; // 삭제 성공
+        }
+        prev = node;
+    }
 
-
-
+    /* 쓰기 락 해제 */
+    rwlock_write_unlock(lock);
     
 /*---------------------------------------------------------------------------*/
 
